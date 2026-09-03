@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon Hangar — Tableau de bord</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #252836;
+  --border: #2e3244;
+  --text: #e4e6f0;
+  --text2: #8b8fa3;
+  --green: #22c55e;
+  --green-bg: rgba(34,197,94,0.12);
+  --orange: #f59e0b;
+  --orange-bg: rgba(245,158,11,0.12);
+  --red: #ef4444;
+  --red-bg: rgba(239,68,68,0.12);
+  --blue: #3b82f6;
+  --blue-bg: rgba(59,130,246,0.12);
+  --purple: #a855f7;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6fa;
+    --surface: #ffffff;
+    --surface2: #f0f1f5;
+    --border: #e2e4ea;
+    --text: #1a1d27;
+    --text2: #6b6f82;
+  }
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 16px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.header h1 { font-size: 1.3rem; font-weight: 700; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.refresh-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.refresh-btn:hover { background: var(--border); }
+.last-update { font-size: 0.75rem; color: var(--text2); }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.card-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text2);
+  margin-bottom: 16px;
+}
+
+.chapelle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.chapelle-label {
+  font-size: 0.8rem;
+  color: var(--text2);
+  min-width: 75px;
+}
+.progress-bar {
+  flex: 1;
+  height: 10px;
+  background: var(--surface2);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s ease;
+}
+.progress-fill.green { background: var(--green); }
+.progress-fill.orange { background: var(--orange); }
+.chapelle-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 35px;
+  text-align: right;
+}
+.total-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.total-row .chapelle-label { font-weight: 700; color: var(--text); }
+
+.revenue-main {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.revenue-sub { font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; }
+.fill-indicator {
+  margin: 12px 0;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: 8px;
+}
+.fill-bar-lg {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.fill-bar-lg .progress-fill { background: var(--blue); }
+.cat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin-top: 6px;
+  color: var(--text2);
+}
+
+.full-width { grid-column: 1 / -1; }
+
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: var(--text2);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+td {
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover { background: var(--surface2); }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-new { background: var(--blue-bg); color: var(--blue); }
+.badge-en-cours { background: var(--orange-bg); color: var(--orange); }
+.badge-visite { background: var(--purple); color: #fff; }
+.badge-signe { background: var(--green-bg); color: var(--green); }
+.badge-actif { background: var(--green-bg); color: var(--green); }
+.badge-termine { background: var(--surface2); color: var(--text2); }
+
+.days-badge {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.days-warn { color: var(--orange); }
+.days-danger { color: var(--red); }
+
+.assurance-yes { color: var(--green); }
+.assurance-no { color: var(--red); font-weight: 600; }
+
+.upcoming-list { list-style: none; }
+.upcoming-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.upcoming-item:last-child { border-bottom: none; }
+.upcoming-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.dot-red { background: var(--red); }
+.dot-orange { background: var(--orange); }
+.dot-blue { background: var(--blue); }
+.dot-warn { background: var(--orange); }
+.upcoming-text { flex: 1; }
+.upcoming-label { font-size: 0.85rem; }
+.upcoming-meta { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+
+.loading { text-align: center; padding: 40px; color: var(--text2); }
+.error-msg { text-align: center; padding: 20px; color: var(--red); font-size: 0.9rem; }
+.mock-banner {
+  background: var(--orange-bg);
+  color: var(--orange);
+  text-align: center;
+  padding: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Mon Hangar</h1>
+  <div class="header-right">
+    <span class="last-update" id="lastUpdate"></span>
+    <button class="refresh-btn" onclick="loadData()">Actualiser</button>
+  </div>
+</div>
+
+<div class="mock-banner" id="mockBanner">Données de démonstration — en attente de connexion NocoDB</div>
+
+<div class="grid">
+  <div class="card" id="fillCard">
+    <div class="card-title">Remplissage</div>
+    <div id="fillContent"><div class="loading">Chargement…</div></div>
+  </div>
+
+  <div class="card" id="revenueCard">
+    <div class="card-title">Revenus</div>
+    <div id="revenueContent"><div class="loading">Chargement…</div></div>
+  </div>
+
+  <div class="card full-width" id="convCard">
+    <div class="card-title">Conversations en cours</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Véhicule</th>
+            <th>Statut</th>
+            <th>Dernier msg</th>
+            <th>Sans réponse</th>
+            <th>Assurance</th>
+          </tr>
+        </thead>
+        <tbody id="convBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card full-width" id="upcomingCard">
+    <div class="card-title">Prochainement</div>
+    <ul class="upcoming-list" id="upcomingList"></ul>
+  </div>
+</div>
+
+<script>
+const API_URL = '';
+const USE_MOCK = true;
+
+const MOCK = {
+  emplacements: Array.from({length:32}, (_,i) => {
+    const n = i + 1;
+    const chapelle = Math.ceil(n / 8);
+    if (n <= 3) return {id:n, numero:n, chapelle, statut:'Occupé', client_nom:'Leroy', categorie:'Court'};
+    if (n === 4) return {id:n, numero:n, chapelle, statut:'Réservé', client_nom:'Jansen', categorie:'Moyen'};
+    if (n <= 8) return {id:n, numero:n, chapelle, statut:'Libre', client_nom:null, categorie:null};
+    if (n === 9) return {id:n, numero:n, chapelle, statut:'Occupé', client_nom:'Dupont', categorie:'Moyen'};
+    if (n === 10) return {id:n, numero:n, chapelle, statut:'Réservé', client_nom:'Martin', categorie:'Moyen'};
+    return {id:n, numero:n, chapelle, statut:'Libre', client_nom:null, categorie:null};
+  }),
+  conversations: [
+    {client:'Dupont', vehicule:'Adria 6m', statut:'Visite planifiée', dernier_msg:'2026-09-01', jours_sans_reponse:2, assurance:'—'},
+    {client:'Jansen', vehicule:'VW 7.2m', statut:'Signé', dernier_msg:'2026-08-28', jours_sans_reponse:0, assurance:'Reçue'},
+    {client:'Martin', vehicule:'—', statut:'Nouveau', dernier_msg:'2026-08-31', jours_sans_reponse:3, assurance:'—'},
+    {client:'Leroy', vehicule:'Fiat 5m', statut:'Actif', dernier_msg:'2026-08-15', jours_sans_reponse:0, assurance:'Manquante'},
+  ],
+  upcoming: [
+    {type:'visite', label:'Visite Dupont', meta:'sam. 05/09 10h00', delay:'dans 2j', color:'red'},
+    {type:'contrat', label:'Début contrat Jansen', meta:'emplacement 15 — 01/10', delay:'dans 28j', color:'orange'},
+    {type:'alerte', label:'Assurance manquante — Leroy', meta:'emplacement 3 — relancer', delay:'actif', color:'warn'},
+  ],
+  revenus: {
+    ca_actif: 226,
+    ca_projete: 2016,
+    taux_remplissage: 0.125,
+    categories: [
+      {nom:'Court', count:1, prix:33, total:33},
+      {nom:'Moyen', count:2, prix:43, total:86},
+      {nom:'Long', count:0, prix:60, total:0},
+    ]
+  }
+};
+
+function renderFill(data) {
+  const emplacements = data.emplacements;
+  const chapelles = [1,2,3,4].map(c => {
+    const spots = emplacements.filter(e => e.chapelle === c);
+    const occ = spots.filter(e => e.statut === 'Occupé').length;
+    const res = spots.filter(e => e.statut === 'Réservé').length;
+    const total = spots.length;
+    const pct = ((occ + res) / total * 100).toFixed(0);
+    return {c, occ, res, libre: total - occ - res, total, pct};
+  });
+  const totalOcc = chapelles.reduce((s,c) => s + c.occ, 0);
+  const totalRes = chapelles.reduce((s,c) => s + c.res, 0);
+  const totalAll = 32;
+  const totalPct = ((totalOcc + totalRes) / totalAll * 100).toFixed(0);
+
+  let html = '';
+  chapelles.forEach(ch => {
+    const fillClass = ch.pct > 60 ? 'green' : ch.pct > 30 ? 'orange' : 'green';
+    html += `<div class="chapelle-row">
+      <span class="chapelle-label">Chapelle ${ch.c}</span>
+      <div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${ch.pct}%"></div></div>
+      <span class="chapelle-count">${ch.occ + ch.res}/${ch.total}</span>
+    </div>`;
+  });
+  html += `<div class="total-row chapelle-row">
+    <span class="chapelle-label">Total</span>
+    <div class="progress-bar"><div class="progress-fill green" style="width:${totalPct}%"></div></div>
+    <span class="chapelle-count">${totalOcc + totalRes}/${totalAll}</span>
+  </div>`;
+  document.getElementById('fillContent').innerHTML = html;
+}
+
+function renderRevenue(data) {
+  const r = data.revenus;
+  let catsHtml = r.categories.map(c =>
+    `<div class="cat-row"><span>${c.nom}: ${c.count} × ${c.prix}€</span><span>${c.total}€</span></div>`
+  ).join('');
+
+  document.getElementById('revenueContent').innerHTML = `
+    <div class="revenue-main">${r.ca_actif} €<span style="font-size:1rem;font-weight:400;color:var(--text2)">/mois</span></div>
+    <div class="revenue-sub">Projeté (plein) : ${r.ca_projete} €/mois</div>
+    <div class="fill-indicator">
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem">
+        <span>Taux remplissage</span><span style="font-weight:600">${(r.taux_remplissage*100).toFixed(0)}%</span>
+      </div>
+      <div class="fill-bar-lg"><div class="progress-fill" style="width:${r.taux_remplissage*100}%"></div></div>
+    </div>
+    ${catsHtml}
+  `;
+}
+
+function renderConversations(data) {
+  const tbody = document.getElementById('convBody');
+  tbody.innerHTML = data.conversations.map(c => {
+    const statutClass = {
+      'Nouveau':'badge-new','En cours':'badge-en-cours','Visite planifiée':'badge-visite',
+      'Signé':'badge-signe','Actif':'badge-actif','Terminé':'badge-termine'
+    }[c.statut] || 'badge-new';
+    const daysClass = c.jours_sans_reponse >= 3 ? 'days-danger' : c.jours_sans_reponse >= 2 ? 'days-warn' : '';
+    const assClass = c.assurance === 'Reçue' ? 'assurance-yes' : c.assurance === 'Manquante' ? 'assurance-no' : '';
+    const assIcon = c.assurance === 'Reçue' ? '✅' : c.assurance === 'Manquante' ? '❌' : '—';
+    return `<tr>
+      <td style="font-weight:600">${c.client}</td>
+      <td>${c.vehicule}</td>
+      <td><span class="badge ${statutClass}">${c.statut}</span></td>
+      <td>${c.dernier_msg}</td>
+      <td><span class="days-badge ${daysClass}">${c.jours_sans_reponse > 0 ? c.jours_sans_reponse + 'j' : '—'}</span></td>
+      <td><span class="${assClass}">${assIcon} ${c.assurance !== '—' ? c.assurance : ''}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderUpcoming(data) {
+  const list = document.getElementById('upcomingList');
+  list.innerHTML = data.upcoming.map(u => {
+    const dotClass = {red:'dot-red',orange:'dot-orange',blue:'dot-blue',warn:'dot-warn'}[u.color] || 'dot-blue';
+    return `<li class="upcoming-item">
+      <div class="upcoming-dot ${dotClass}"></div>
+      <div class="upcoming-text">
+        <div class="upcoming-label">${u.label}</div>
+        <div class="upcoming-meta">${u.meta} — <strong>${u.delay}</strong></div>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+async function loadData() {
+  document.getElementById('lastUpdate').textContent = '';
+  let data;
+  if (USE_MOCK || !API_URL) {
+    data = MOCK;
+    document.getElementById('mockBanner').style.display = 'block';
+  } else {
+    try {
+      const resp = await fetch(API_URL);
+      if (!resp.ok) throw new Error(resp.statusText);
+      data = await resp.json();
+      document.getElementById('mockBanner').style.display = 'none';
+    } catch(e) {
+      document.getElementById('mockBanner').textContent = 'Erreur de connexion — données mock affichées';
+      document.getElementById('mockBanner').style.display = 'block';
+      data = MOCK;
+    }
+  }
+  renderFill(data);
+  renderRevenue(data);
+  renderConversations(data);
+  renderUpcoming(data);
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent = `MAJ ${now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+loadData();
+</script>
+</body>
+</html>
