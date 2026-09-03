@@ -285,8 +285,8 @@ tr:hover { background: var(--surface2); }
 </div>
 
 <script>
-const API_URL = '';
-const USE_MOCK = true;
+const API_URL = 'https://automate.libraudit.tech/webhook/cc-dashboard';
+const USE_MOCK = false;
 
 const MOCK = {
   emplacements: Array.from({length:32}, (_,i) => {
@@ -322,15 +322,44 @@ const MOCK = {
   }
 };
 
+function adaptData(raw) {
+  if (!raw.chapelles) return raw;
+  const chapelles = raw.chapelles;
+  const convs = (raw.conversations || []).map(c => {
+    const clientObj = (c.Clients || [])[0] || {};
+    const daysSince = c.Date_reception ? Math.floor((Date.now() - new Date(c.Date_reception).getTime()) / 86400000) : 0;
+    return {
+      client: clientObj.Prenom && clientObj.Nom ? `${clientObj.Prenom} ${clientObj.Nom}` : (c.Sujet || '?'),
+      vehicule: clientObj.Marque_modele || '—',
+      statut: c.Statut || 'Nouveau',
+      dernier_msg: c.Date_reception ? c.Date_reception.slice(0,10) : '—',
+      jours_sans_reponse: c.Reponse_envoyee ? 0 : daysSince,
+      assurance: c.Contrats && c.Contrats.length ? (c.Contrats[0].Attestation_assurance || '—') : '—'
+    };
+  });
+  const upcoming = [];
+  (raw.visites || []).forEach(v => {
+    const clientObj = (v.Clients || [])[0] || {};
+    upcoming.push({type:'visite', label:`Visite ${clientObj.Nom || '?'}`, meta:v.Date_heure || '', delay:'planifiee', color:'red'});
+  });
+  (raw.contrats || []).filter(c => c.Statut === 'Reserve').forEach(c => {
+    const empObj = (c.Emplacements || [])[0] || {};
+    upcoming.push({type:'contrat', label:`Debut contrat ${c.Ref_monhangar || ''}`, meta:`empl. ${empObj.Numero || '?'} — ${c.Date_debut || ''}`, delay:'a venir', color:'orange'});
+  });
+  (raw.contrats || []).filter(c => c.Attestation_assurance === 'Manquante').forEach(c => {
+    const empObj = (c.Emplacements || [])[0] || {};
+    upcoming.push({type:'alerte', label:`Assurance manquante`, meta:`empl. ${empObj.Numero || '?'} — relancer`, delay:'actif', color:'warn'});
+  });
+  return { chapelles, emplacements: raw.emplacements, conversations: convs, upcoming, revenus: raw.revenus };
+}
+
 function renderFill(data) {
-  const emplacements = data.emplacements;
-  const chapelles = [1,2,3,4].map(c => {
-    const spots = emplacements.filter(e => e.chapelle === c);
-    const occ = spots.filter(e => e.statut === 'Occupé').length;
-    const res = spots.filter(e => e.statut === 'Réservé').length;
-    const total = spots.length;
-    const pct = ((occ + res) / total * 100).toFixed(0);
-    return {c, occ, res, libre: total - occ - res, total, pct};
+  const chapelles = data.chapelles || [1,2,3,4].map(c => {
+    const spots = (data.emplacements || []).filter(e => (e.Chapelle || e.chapelle) == c);
+    const occ = spots.filter(e => (e.Statut || e.statut) === 'Occupe' || (e.Statut || e.statut) === 'Occup\u00e9').length;
+    const res = spots.filter(e => (e.Statut || e.statut) === 'Reserve' || (e.Statut || e.statut) === 'R\u00e9serv\u00e9').length;
+    const total = spots.length || 8;
+    return {c, occ, res, libre: total - occ - res, total, pct: total > 0 ? ((occ + res) / total * 100).toFixed(0) : 0};
   });
   const totalOcc = chapelles.reduce((s,c) => s + c.occ, 0);
   const totalRes = chapelles.reduce((s,c) => s + c.res, 0);
@@ -376,20 +405,23 @@ function renderRevenue(data) {
 function renderConversations(data) {
   const tbody = document.getElementById('convBody');
   tbody.innerHTML = data.conversations.map(c => {
+    const s = c.statut || c.Statut || 'Nouveau';
     const statutClass = {
-      'Nouveau':'badge-new','En cours':'badge-en-cours','Visite planifiée':'badge-visite',
-      'Signé':'badge-signe','Actif':'badge-actif','Terminé':'badge-termine'
-    }[c.statut] || 'badge-new';
-    const daysClass = c.jours_sans_reponse >= 3 ? 'days-danger' : c.jours_sans_reponse >= 2 ? 'days-warn' : '';
-    const assClass = c.assurance === 'Reçue' ? 'assurance-yes' : c.assurance === 'Manquante' ? 'assurance-no' : '';
-    const assIcon = c.assurance === 'Reçue' ? '✅' : c.assurance === 'Manquante' ? '❌' : '—';
+      'Nouveau':'badge-new','En cours':'badge-en-cours','Visite planifiee':'badge-visite','Visite planifiée':'badge-visite',
+      'Signe':'badge-signe','Signé':'badge-signe','Actif':'badge-actif','Termine':'badge-termine','Terminé':'badge-termine'
+    }[s] || 'badge-new';
+    const days = c.jours_sans_reponse || 0;
+    const daysClass = days >= 3 ? 'days-danger' : days >= 2 ? 'days-warn' : '';
+    const ass = c.assurance || '—';
+    const assClass = ass === 'Reçue' || ass === 'Recue' ? 'assurance-yes' : ass === 'Manquante' ? 'assurance-no' : '';
+    const assIcon = ass === 'Reçue' || ass === 'Recue' ? '✅' : ass === 'Manquante' ? '❌' : '—';
     return `<tr>
-      <td style="font-weight:600">${c.client}</td>
-      <td>${c.vehicule}</td>
-      <td><span class="badge ${statutClass}">${c.statut}</span></td>
-      <td>${c.dernier_msg}</td>
-      <td><span class="days-badge ${daysClass}">${c.jours_sans_reponse > 0 ? c.jours_sans_reponse + 'j' : '—'}</span></td>
-      <td><span class="${assClass}">${assIcon} ${c.assurance !== '—' ? c.assurance : ''}</span></td>
+      <td style="font-weight:600">${c.client || '?'}</td>
+      <td>${c.vehicule || '—'}</td>
+      <td><span class="badge ${statutClass}">${s}</span></td>
+      <td>${c.dernier_msg || '—'}</td>
+      <td><span class="days-badge ${daysClass}">${days > 0 ? days + 'j' : '—'}</span></td>
+      <td><span class="${assClass}">${assIcon} ${ass !== '—' ? ass : ''}</span></td>
     </tr>`;
   }).join('');
 }
@@ -418,7 +450,8 @@ async function loadData() {
     try {
       const resp = await fetch(API_URL);
       if (!resp.ok) throw new Error(resp.statusText);
-      data = await resp.json();
+      const raw = await resp.json();
+      data = adaptData(raw);
       document.getElementById('mockBanner').style.display = 'none';
     } catch(e) {
       document.getElementById('mockBanner').textContent = 'Erreur de connexion — données mock affichées';
