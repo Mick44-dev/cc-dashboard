@@ -1,0 +1,132 @@
+name: Mon Hangar IMAP Poller
+
+on:
+  schedule:
+    - cron: '*/2 * * * *'
+  workflow_dispatch:
+
+jobs:
+  poll-imap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Poll iCloud IMAP for Mon Hangar emails
+        env:
+          IMAP_HOST: imap.mail.me.com
+          IMAP_PORT: 993
+          IMAP_USER: ${{ secrets.IMAP_USER }}
+          IMAP_PASS: ${{ secrets.IMAP_PASS }}
+          WEBHOOK_URL: https://automate.libraudit.tech/webhook/monhangar-email
+        run: |
+          import imaplib
+          import email
+          import email.header
+          import json
+          import urllib.request
+          import sys
+
+          def decode_header_value(hdr):
+              if hdr is None:
+                  return ""
+              decoded = email.header.decode_header(hdr)
+              parts = []
+              for part, charset in decoded:
+                  if isinstance(part, bytes):
+                      parts.append(part.decode(charset or "utf-8", errors="replace"))
+                  else:
+                      parts.append(part)
+              return " ".join(parts)
+
+          def get_text(msg):
+              text = ""
+              if msg.is_multipart():
+                  for part in msg.walk():
+                      ct = part.get_content_type()
+                      if ct == "text/plain":
+                          charset = part.get_content_charset() or "utf-8"
+                          try:
+                              text = part.get_payload(decode=True).decode(charset, errors="replace")
+                          except Exception:
+                              text = part.get_payload(decode=True).decode("utf-8", errors="replace")
+                          break
+                      elif ct == "text/html" and not text:
+                          charset = part.get_content_charset() or "utf-8"
+                          try:
+                              text = part.get_payload(decode=True).decode(charset, errors="replace")
+                          except Exception:
+                              text = part.get_payload(decode=True).decode("utf-8", errors="replace")
+              else:
+                  charset = msg.get_content_charset() or "utf-8"
+                  try:
+                      text = msg.get_payload(decode=True).decode(charset, errors="replace")
+                  except Exception:
+                      text = msg.get_payload(decode=True).decode("utf-8", errors="replace")
+              return text[:5000]
+
+          def send_to_webhook(data):
+              payload = json.dumps(data).encode("utf-8")
+              req = urllib.request.Request(
+                  os.environ["WEBHOOK_URL"],
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return resp.status
+              except Exception as e:
+                  print(f"Webhook error: {e}", file=sys.stderr)
+                  return None
+
+          import os
+
+          try:
+              conn = imaplib.IMAP4_SSL(os.environ["IMAP_HOST"], int(os.environ["IMAP_PORT"]))
+              conn.login(os.environ["IMAP_USER"], os.environ["IMAP_PASS"])
+              conn.select("INBOX")
+
+              status, data = conn.search(None, "UNSEEN", "FROM", "monhangar.fr")
+              if status != "OK":
+                  print("Search failed")
+                  sys.exit(1)
+
+              msg_ids = data[0].split() if data[0] else []
+              print(f"Found {len(msg_ids)} unseen Mon Hangar emails")
+
+              for msg_id in msg_ids:
+                  status, msg_data = conn.fetch(msg_id, "(RFC822)")
+                  if status != "OK":
+                      continue
+
+                  raw = msg_data[0][1]
+                  msg = email.message_from_bytes(raw)
+
+                  subject = decode_header_value(msg.get("Subject"))
+                  from_addr = decode_header_value(msg.get("From"))
+                  date_str = decode_header_value(msg.get("Date"))
+                  body = get_text(msg)
+
+                  payload = {
+                      "subject": subject,
+                      "from": from_addr,
+                      "date": date_str,
+                      "text": body,
+                  }
+
+                  print(f"Forwarding: {subject[:60]}")
+                  status_code = send_to_webhook(payload)
+                  if status_code and 200 <= status_code < 300:
+                      conn.store(msg_id, "+FLAGS", "\\Seen")
+                      print(f"Forwarded OK (HTTP {status_code})")
+                  else:
+                      print(f"Forward FAILED ({status_code})", file=sys.stderr)
+
+              conn.logout()
+          except Exception as e:
+              print(f"IMAP error: {e}", file=sys.stderr)
+              sys.exit(1)
+        shell: python3 {0}
