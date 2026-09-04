@@ -278,6 +278,25 @@ tr:hover { background: var(--surface2); }
     </div>
   </div>
 
+  <div class="card full-width" id="contratsCard">
+    <div class="card-title">Contrats actifs</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Véhicule</th>
+            <th>Début</th>
+            <th>Fin</th>
+            <th>Loyer</th>
+            <th>Assurance</th>
+          </tr>
+        </thead>
+        <tbody id="contratsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="card full-width" id="upcomingCard">
     <div class="card-title">Prochainement</div>
     <ul class="upcoming-list" id="upcomingList"></ul>
@@ -358,7 +377,7 @@ function adaptData(raw) {
     const clientObj = (c.Clients || [])[0] || {};
     upcoming.push({type:'alerte', label:`Assurance manquante — ${fullName(clientObj)}`, meta:`relancer`, delay:'actif', color:'warn'});
   });
-  return { chapelles, emplacements: raw.emplacements, conversations: convs, upcoming, revenus: raw.revenus };
+  return { chapelles, emplacements: raw.emplacements, conversations: convs, contrats: raw.contrats, upcoming, revenus: raw.revenus };
 }
 
 function renderFill(data) {
@@ -448,6 +467,25 @@ function renderUpcoming(data) {
   }).join('');
 }
 
+function renderContrats(data) {
+  const tbody = document.getElementById('contratsBody');
+  const list = (data.contrats || []).slice().sort((a,b) => (a['Date debut']||'').localeCompare(b['Date debut']||''));
+  tbody.innerHTML = list.map(c => {
+    const clientObj = (c.Clients || [])[0] || {};
+    const empObj = (c.Emplacement || [])[0] || {};
+    const ass = c['Attestation assurance'] || '—';
+    const assClass = ass === 'Recue' ? 'assurance-yes' : ass === 'Manquante' ? 'assurance-no' : '';
+    return `<tr>
+      <td style="font-weight:600">${fullName(clientObj)}</td>
+      <td>${clientObj['Marque / Modele'] || '—'} <span style="color:var(--text2)">(${clientObj['Longueur vehicule'] || '—'})</span></td>
+      <td>${c['Date debut'] || '—'}</td>
+      <td>${c['Date fin'] || '—'}</td>
+      <td>${c['Tarif mensuel'] != null ? c['Tarif mensuel'] + ' €/mois' : '—'}</td>
+      <td class="${assClass}">${ass}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function loadData() {
   document.getElementById('lastUpdate').textContent = '';
   let data;
@@ -470,6 +508,7 @@ async function loadData() {
   renderFill(data);
   renderRevenue(data);
   renderConversations(data);
+  renderContrats(data);
   renderUpcoming(data);
   const now = new Date();
   document.getElementById('lastUpdate').textContent = `MAJ ${now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
