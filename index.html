@@ -322,6 +322,14 @@ const MOCK = {
   }
 };
 
+function fullName(clientObj) {
+  if (!clientObj) return '?';
+  const p = clientObj.Prenom || '';
+  const n = clientObj.Nom || '';
+  if (p && n) return `${p} ${n}`;
+  return n || p || '?';
+}
+
 function adaptData(raw) {
   if (!raw.chapelles) return raw;
   const chapelles = raw.chapelles;
@@ -329,26 +337,26 @@ function adaptData(raw) {
     const clientObj = (c.Clients || [])[0] || {};
     const daysSince = c.Date_reception ? Math.floor((Date.now() - new Date(c.Date_reception).getTime()) / 86400000) : 0;
     return {
-      client: clientObj.Prenom && clientObj.Nom ? `${clientObj.Prenom} ${clientObj.Nom}` : (c.Sujet || '?'),
-      vehicule: clientObj.Marque_modele || '—',
+      client: fullName(clientObj),
+      vehicule: clientObj['Marque / Modele'] || '—',
       statut: c.Statut || 'Nouveau',
       dernier_msg: c.Date_reception ? c.Date_reception.slice(0,10) : '—',
       jours_sans_reponse: c.Reponse_envoyee ? 0 : daysSince,
-      assurance: c.Contrats && c.Contrats.length ? (c.Contrats[0].Attestation_assurance || '—') : '—'
+      assurance: c.Contrats && c.Contrats.length ? (c.Contrats[0]['Attestation assurance'] || '—') : '—'
     };
   });
   const upcoming = [];
   (raw.visites || []).forEach(v => {
     const clientObj = (v.Clients || [])[0] || {};
-    upcoming.push({type:'visite', label:`Visite ${clientObj.Nom || '?'}`, meta:v.Date_heure || '', delay:'planifiee', color:'red'});
+    upcoming.push({type:'visite', label:`Visite ${fullName(clientObj)}`, meta:v['Date / Heure'] || '', delay:'planifiee', color:'red'});
   });
-  (raw.contrats || []).filter(c => c.Statut === 'Reserve').forEach(c => {
-    const empObj = (c.Emplacements || [])[0] || {};
-    upcoming.push({type:'contrat', label:`Debut contrat ${c.Ref_monhangar || ''}`, meta:`empl. ${empObj.Numero || '?'} — ${c.Date_debut || ''}`, delay:'a venir', color:'orange'});
+  (raw.contrats || []).filter(c => c['Date debut'] && new Date(c['Date debut']) > new Date()).forEach(c => {
+    const clientObj = (c.Clients || [])[0] || {};
+    upcoming.push({type:'contrat', label:`Début contrat ${fullName(clientObj)}`, meta:`${c['Date debut'] || ''}`, delay:'à venir', color:'orange'});
   });
-  (raw.contrats || []).filter(c => c.Attestation_assurance === 'Manquante').forEach(c => {
-    const empObj = (c.Emplacements || [])[0] || {};
-    upcoming.push({type:'alerte', label:`Assurance manquante`, meta:`empl. ${empObj.Numero || '?'} — relancer`, delay:'actif', color:'warn'});
+  (raw.contrats || []).filter(c => c['Attestation assurance'] === 'Manquante').forEach(c => {
+    const clientObj = (c.Clients || [])[0] || {};
+    upcoming.push({type:'alerte', label:`Assurance manquante — ${fullName(clientObj)}`, meta:`relancer`, delay:'actif', color:'warn'});
   });
   return { chapelles, emplacements: raw.emplacements, conversations: convs, upcoming, revenus: raw.revenus };
 }
