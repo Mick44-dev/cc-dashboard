@@ -38,17 +38,17 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  padding: 16px;
+  padding: clamp(12px, 2vw, 24px);
 }
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: clamp(14px, 2.5vw, 20px);
   flex-wrap: wrap;
   gap: 8px;
 }
-.header h1 { font-size: 1.3rem; font-weight: 700; }
+.header h1 { font-size: clamp(1.15rem, 1rem + 1.2vw, 1.5rem); font-weight: 700; }
 .header-right { display: flex; align-items: center; gap: 12px; }
 .refresh-btn {
   background: var(--surface2);
@@ -62,14 +62,15 @@ body {
 .refresh-btn:hover { background: var(--border); }
 .last-update { font-size: 0.75rem; color: var(--text2); }
 
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(10px, 2vw, 16px); margin-bottom: 16px; }
 @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 20px;
+  padding: clamp(16px, 2vw, 24px);
+  min-width: 0;
 }
 .card-title {
   font-size: 0.75rem;
@@ -77,7 +78,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text2);
-  margin-bottom: 16px;
+  margin-bottom: clamp(12px, 2vw, 16px);
 }
 
 .chapelle-row {
@@ -119,7 +120,7 @@ body {
 .total-row .chapelle-label { font-weight: 700; color: var(--text); }
 
 .revenue-main {
-  font-size: 1.8rem;
+  font-size: clamp(1.5rem, 1.2rem + 1.8vw, 2rem);
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -172,6 +173,47 @@ td {
 }
 tr:last-child td { border-bottom: none; }
 tr:hover { background: var(--surface2); }
+
+@media (max-width: 640px) {
+  .table-wrap { overflow: visible; }
+  table, thead, tbody, tr { display: block; }
+  thead { display: none; }
+  tbody tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2px 12px;
+    margin-bottom: 10px;
+  }
+  tbody tr:last-child { margin-bottom: 0; }
+  tbody tr:hover { background: var(--surface); }
+  td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+  }
+  td:last-child { border-bottom: none; }
+  td::before {
+    content: attr(data-label);
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text2);
+    flex-shrink: 0;
+    text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .chapelle-label { min-width: 68px; font-size: 0.75rem; }
+  .chapelle-count { min-width: 32px; font-size: 0.75rem; }
+  .refresh-btn { padding: 6px 12px; }
+}
 
 .badge {
   display: inline-block;
@@ -443,12 +485,12 @@ function renderConversations(data) {
     const assClass = ass === 'Reçue' || ass === 'Recue' ? 'assurance-yes' : ass === 'Manquante' ? 'assurance-no' : '';
     const assIcon = ass === 'Reçue' || ass === 'Recue' ? '✅' : ass === 'Manquante' ? '❌' : '—';
     return `<tr>
-      <td style="font-weight:600">${c.client || '?'}</td>
-      <td>${c.vehicule || '—'}</td>
-      <td><span class="badge ${statutClass}">${s}</span></td>
-      <td>${c.dernier_msg || '—'}</td>
-      <td><span class="days-badge ${daysClass}">${days > 0 ? days + 'j' : '—'}</span></td>
-      <td><span class="${assClass}">${assIcon} ${ass !== '—' ? ass : ''}</span></td>
+      <td data-label="Client" style="font-weight:600">${c.client || '?'}</td>
+      <td data-label="Véhicule">${c.vehicule || '—'}</td>
+      <td data-label="Statut"><span class="badge ${statutClass}">${s}</span></td>
+      <td data-label="Dernier msg">${c.dernier_msg || '—'}</td>
+      <td data-label="Sans réponse"><span class="days-badge ${daysClass}">${days > 0 ? days + 'j' : '—'}</span></td>
+      <td data-label="Assurance"><span class="${assClass}">${assIcon} ${ass !== '—' ? ass : ''}</span></td>
     </tr>`;
   }).join('');
 }
@@ -476,12 +518,12 @@ function renderContrats(data) {
     const ass = c['Attestation assurance'] || '—';
     const assClass = ass === 'Recue' ? 'assurance-yes' : ass === 'Manquante' ? 'assurance-no' : '';
     return `<tr>
-      <td style="font-weight:600">${fullName(clientObj)}</td>
-      <td>${clientObj['Marque / Modele'] || '—'} <span style="color:var(--text2)">(${clientObj['Longueur vehicule'] || '—'})</span></td>
-      <td>${c['Date debut'] || '—'}</td>
-      <td>${c['Date fin'] || '—'}</td>
-      <td>${c['Tarif mensuel'] != null ? c['Tarif mensuel'] + ' €/mois' : '—'}</td>
-      <td class="${assClass}">${ass}</td>
+      <td data-label="Client" style="font-weight:600">${fullName(clientObj)}</td>
+      <td data-label="Véhicule">${clientObj['Marque / Modele'] || '—'} <span style="color:var(--text2)">(${clientObj['Longueur vehicule'] || '—'})</span></td>
+      <td data-label="Début">${c['Date debut'] || '—'}</td>
+      <td data-label="Fin">${c['Date fin'] || '—'}</td>
+      <td data-label="Loyer">${c['Tarif mensuel'] != null ? c['Tarif mensuel'] + ' €/mois' : '—'}</td>
+      <td data-label="Assurance" class="${assClass}">${ass}</td>
     </tr>`;
   }).join('');
 }
