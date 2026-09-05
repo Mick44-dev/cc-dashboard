@@ -199,6 +199,25 @@ tr:hover { background: var(--surface2); }
 .assurance-no { color: var(--red); font-weight: 600; }
 
 .upcoming-list { list-style: none; }
+.conv-list { list-style: none; }
+.conv-item { border-bottom: 1px solid var(--border); }
+.conv-item:last-child { border-bottom: none; }
+.conv-item summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.conv-item summary::-webkit-details-marker { display: none; }
+.conv-name { font-weight: 600; flex: 1; }
+.conv-sujet { font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+.conv-msg { font-size: 0.85rem; color: var(--text2); margin-bottom: 4px; }
+.conv-meta { font-size: 0.75rem; color: var(--text2); display: flex; gap: 10px; }
+.conv-detail { padding: 0 0 12px 24px; }
+.conv-chevron { color: var(--text2); font-size: 0.7rem; transition: transform 0.2s; }
+details[open] .conv-chevron { transform: rotate(90deg); }
 .upcoming-item {
   display: flex;
   align-items: flex-start;
@@ -260,7 +279,12 @@ tr:hover { background: var(--surface2); }
   </div>
 
   <div class="card full-width" id="convCard">
-    <div class="card-title">Conversations en cours</div>
+    <div class="card-title">Échanges en cours</div>
+    <ul class="conv-list" id="convList"></ul>
+  </div>
+
+  <div class="card full-width" id="contratsCard">
+    <div class="card-title">Contrats</div>
     <div class="table-wrap">
       <table>
         <thead>
@@ -268,28 +292,10 @@ tr:hover { background: var(--surface2); }
             <th>Client</th>
             <th>Véhicule</th>
             <th>Statut</th>
-            <th>Dernier msg</th>
-            <th>Sans réponse</th>
-            <th>Assurance</th>
-          </tr>
-        </thead>
-        <tbody id="convBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="card full-width" id="contratsCard">
-    <div class="card-title">Contrats actifs</div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Client</th>
-            <th>Véhicule</th>
             <th>Début</th>
             <th>Fin</th>
             <th>Loyer</th>
-            <th>Assurance</th>
+            <th>Dépôt</th>
           </tr>
         </thead>
         <tbody id="contratsBody"></tbody>
@@ -354,13 +360,17 @@ function adaptData(raw) {
   const chapelles = raw.chapelles;
   const convs = (raw.conversations || []).map(c => {
     const clientObj = (c.Clients || [])[0] || {};
-    const daysSince = c.Date_reception ? Math.floor((Date.now() - new Date(c.Date_reception).getTime()) / 86400000) : 0;
+    const d = c['Date reception'] ? String(c['Date reception']).slice(0,10) : '';
+    const daysSince = c['Date reception'] ? Math.floor((Date.now() - new Date(c['Date reception']).getTime()) / 86400000) : 0;
     return {
       client: fullName(clientObj),
       vehicule: clientObj['Marque / Modele'] || '—',
       statut: c.Statut || 'Nouveau',
-      dernier_msg: c.Date_reception ? c.Date_reception.slice(0,10) : '—',
-      jours_sans_reponse: c.Reponse_envoyee ? 0 : daysSince,
+      canal: c.Canal || '',
+      sujet: c.Sujet || '',
+      message: c.Message || '',
+      dernier_msg: d || '—',
+      jours_sans_reponse: c['Reponse envoyee'] ? 0 : daysSince,
       assurance: c.Contrats && c.Contrats.length ? (c.Contrats[0]['Attestation assurance'] || '—') : '—'
     };
   });
@@ -430,26 +440,37 @@ function renderRevenue(data) {
 }
 
 function renderConversations(data) {
-  const tbody = document.getElementById('convBody');
-  tbody.innerHTML = data.conversations.map(c => {
-    const s = c.statut || c.Statut || 'Nouveau';
+  const list = document.getElementById('convList');
+  const items = data.conversations || [];
+  if (!items.length) {
+    list.innerHTML = '<li><div class="upcoming-meta" style="padding:10px 0">Aucun échange en cours</div></li>';
+    return;
+  }
+  list.innerHTML = items.map(c => {
+    const s = c.statut || 'Nouveau';
     const statutClass = {
       'Nouveau':'badge-new','En cours':'badge-en-cours','Visite planifiee':'badge-visite','Visite planifiée':'badge-visite',
-      'Signe':'badge-signe','Signé':'badge-signe','Actif':'badge-actif','Termine':'badge-termine','Terminé':'badge-termine'
+      'Signe':'badge-signe','Signé':'badge-signe','Actif':'badge-actif','Termine':'badge-termine','Terminé':'badge-termine',
+      'Traite':'badge-actif','Relance':'badge-en-cours'
     }[s] || 'badge-new';
-    const days = c.jours_sans_reponse || 0;
-    const daysClass = days >= 3 ? 'days-danger' : days >= 2 ? 'days-warn' : '';
-    const ass = c.assurance || '—';
-    const assClass = ass === 'Reçue' || ass === 'Recue' ? 'assurance-yes' : ass === 'Manquante' ? 'assurance-no' : '';
-    const assIcon = ass === 'Reçue' || ass === 'Recue' ? '✅' : ass === 'Manquante' ? '❌' : '—';
-    return `<tr>
-      <td style="font-weight:600">${c.client || '?'}</td>
-      <td>${c.vehicule || '—'}</td>
-      <td><span class="badge ${statutClass}">${s}</span></td>
-      <td>${c.dernier_msg || '—'}</td>
-      <td><span class="days-badge ${daysClass}">${days > 0 ? days + 'j' : '—'}</span></td>
-      <td><span class="${assClass}">${assIcon} ${ass !== '—' ? ass : ''}</span></td>
-    </tr>`;
+    return `<li class="conv-item">
+      <details>
+        <summary>
+          <span class="conv-chevron">▶</span>
+          <span class="conv-name">${c.client || '?'}</span>
+          <span class="badge ${statutClass}">${s}</span>
+        </summary>
+        <div class="conv-detail">
+          <div class="conv-sujet">${c.sujet || 'Sans objet'}</div>
+          <div class="conv-msg">${c.message || '—'}</div>
+          <div class="conv-meta">
+            <span>${c.canal || '—'}</span>
+            <span>${c.dernier_msg}</span>
+            ${c.assurance && c.assurance !== '—' ? `<span>Assurance : ${c.assurance}</span>` : ''}
+          </div>
+        </div>
+      </details>
+    </li>`;
   }).join('');
 }
 
@@ -472,16 +493,17 @@ function renderContrats(data) {
   const list = (data.contrats || []).slice().sort((a,b) => (a['Date debut']||'').localeCompare(b['Date debut']||''));
   tbody.innerHTML = list.map(c => {
     const clientObj = (c.Clients || [])[0] || {};
-    const empObj = (c.Emplacement || [])[0] || {};
-    const ass = c['Attestation assurance'] || '—';
-    const assClass = ass === 'Recue' ? 'assurance-yes' : ass === 'Manquante' ? 'assurance-no' : '';
+    const statut = c.Statut || '—';
+    const statutClass = { 'Actif':'badge-actif', 'En attente':'badge-en-cours', 'Resilie':'badge-termine', 'Expire':'badge-termine' }[statut] || 'badge-new';
+    const depot = c['Date depot'] ? String(c['Date depot']).slice(0,10) : '—';
     return `<tr>
       <td style="font-weight:600">${fullName(clientObj)}</td>
       <td>${clientObj['Marque / Modele'] || '—'} <span style="color:var(--text2)">(${clientObj['Longueur vehicule'] || '—'})</span></td>
+      <td><span class="badge ${statutClass}">${statut}</span></td>
       <td>${c['Date debut'] || '—'}</td>
       <td>${c['Date fin'] || '—'}</td>
       <td>${c['Tarif mensuel'] != null ? c['Tarif mensuel'] + ' €/mois' : '—'}</td>
-      <td class="${assClass}">${ass}</td>
+      <td>${depot}</td>
     </tr>`;
   }).join('');
 }
