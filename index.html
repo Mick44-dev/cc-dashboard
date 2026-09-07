@@ -332,6 +332,7 @@ details[open] .conv-chevron { transform: rotate(90deg); }
         <thead>
           <tr>
             <th>Client</th>
+            <th>Téléphone</th>
             <th>Véhicule</th>
             <th>Statut</th>
             <th>Début</th>
@@ -406,6 +407,7 @@ function adaptData(raw) {
     const daysSince = c['Date reception'] ? Math.floor((Date.now() - new Date(c['Date reception']).getTime()) / 86400000) : 0;
     return {
       client: fullName(clientObj),
+      telephone: clientObj.Telephone || '',
       vehicule: clientObj['Marque / Modele'] || '—',
       statut: c.Statut || 'Nouveau',
       canal: c.Canal || '',
@@ -500,6 +502,7 @@ return `<li class="conv-item">
         <summary>
           <span class="conv-chevron">▶</span>
           <span class="conv-name">${c.client || '?'}</span>
+          ${c.telephone ? `<span class="upcoming-meta">${c.telephone}</span>` : ''}
           <span class="badge ${statutClass}">${s}</span>
         </summary>
         <div class="conv-detail">
@@ -540,6 +543,7 @@ function renderContrats(data) {
     const depot = c['Date depot'] ? String(c['Date depot']).slice(0,10) : '—';
     return `<tr>
       <td data-label="Client" style="font-weight:600">${fullName(clientObj)}</td>
+      <td data-label="Téléphone">${clientObj.Telephone || '—'}</td>
       <td data-label="Véhicule">${clientObj['Marque / Modele'] || '—'} <span style="color:var(--text2)">(${clientObj['Longueur vehicule'] || '—'})</span></td>
       <td data-label="Statut"><span class="badge ${statutClass}">${statut}</span></td>
       <td data-label="Début">${c['Date debut'] || '—'}</td>
