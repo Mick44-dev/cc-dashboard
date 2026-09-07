@@ -28,6 +28,8 @@ jobs:
           import json
           import urllib.request
           import sys
+          import re
+          import html as htmlmod
 
           def decode_header_value(hdr):
               if hdr is None:
@@ -40,6 +42,16 @@ jobs:
                   else:
                       parts.append(part)
               return " ".join(parts)
+
+          def html_to_text(html):
+              html = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", html)
+              html = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>|</li>", "\n", html)
+              html = re.sub(r"(?i)</[a-z0-9]+>", " ", html)
+              html = re.sub(r"(?i)<[^>]+>", " ", html)
+              html = htmlmod.unescape(html)
+              html = re.sub(r"[ \t\r\f]+", " ", html)
+              html = re.sub(r"\n\s*\n+", "\n", html)
+              return html.strip()
 
           def get_text(msg):
               text = ""
@@ -65,6 +77,8 @@ jobs:
                       text = msg.get_payload(decode=True).decode(charset, errors="replace")
                   except Exception:
                       text = msg.get_payload(decode=True).decode("utf-8", errors="replace")
+              if msg.get_content_type() == "text/html":
+                  text = html_to_text(text)
               return text[:5000]
 
           def send_to_webhook(data):
