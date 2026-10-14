@@ -240,7 +240,6 @@ tr:hover { background: var(--surface2); }
 .assurance-yes { color: var(--green); }
 .assurance-no { color: var(--red); font-weight: 600; }
 
-.upcoming-list { list-style: none; }
 .conv-list { list-style: none; }
 .conv-item { border-bottom: 1px solid var(--border); }
 .conv-item:last-child { border-bottom: none; }
@@ -260,28 +259,12 @@ tr:hover { background: var(--surface2); }
 .conv-detail { padding: 0 0 12px 24px; }
 .conv-chevron { color: var(--text2); font-size: 0.7rem; transition: transform 0.2s; }
 details[open] .conv-chevron { transform: rotate(90deg); }
-.upcoming-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 0;
+.echange-item {
+  padding: 8px 0;
   border-bottom: 1px solid var(--border);
 }
-.upcoming-item:last-child { border-bottom: none; }
-.upcoming-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-top: 4px;
-  flex-shrink: 0;
-}
-.dot-red { background: var(--red); }
-.dot-orange { background: var(--orange); }
-.dot-blue { background: var(--blue); }
-.dot-warn { background: var(--orange); }
-.upcoming-text { flex: 1; }
-.upcoming-label { font-size: 0.85rem; }
-.upcoming-meta { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+.echange-item:last-child { border-bottom: none; }
+.upcoming-meta { font-size: 0.75rem; color: var(--text2); }
 
 .loading { text-align: center; padding: 40px; color: var(--text2); }
 .error-msg { text-align: center; padding: 20px; color: var(--red); font-size: 0.9rem; }
@@ -345,11 +328,6 @@ details[open] .conv-chevron { transform: rotate(90deg); }
       </table>
     </div>
   </div>
-
-  <div class="card full-width" id="upcomingCard">
-    <div class="card-title">Prochainement</div>
-    <ul class="upcoming-list" id="upcomingList"></ul>
-  </div>
 </div>
 
 <script>
@@ -367,17 +345,12 @@ const MOCK = {
     if (n === 10) return {id:n, numero:n, chapelle, statut:'Réservé', client_nom:'Martin', categorie:'Moyen'};
     return {id:n, numero:n, chapelle, statut:'Libre', client_nom:null, categorie:null};
   }),
-  conversations: [
-    {client:'Dupont', vehicule:'Adria 6m', statut:'Visite planifiée', dernier_msg:'2026-09-01', jours_sans_reponse:2, assurance:'—'},
-    {client:'Jansen', vehicule:'VW 7.2m', statut:'Signé', dernier_msg:'2026-08-28', jours_sans_reponse:0, assurance:'Reçue'},
-    {client:'Martin', vehicule:'—', statut:'Nouveau', dernier_msg:'2026-08-31', jours_sans_reponse:3, assurance:'—'},
-    {client:'Leroy', vehicule:'Fiat 5m', statut:'Actif', dernier_msg:'2026-08-15', jours_sans_reponse:0, assurance:'Manquante'},
+  contacts: [
+    { nom:'Dupont Jean', telephone:'06 00 00 00 01', statutAvance:'Visite planifiée', echanges:[{sujet:'Visite prévue', message:'RDV samedi', canal:'Telephone', date:'2026-09-01'}] },
+    { nom:'Jansen Marc', telephone:'06 00 00 00 02', statutAvance:'Signé', echanges:[{sujet:'Signature', message:'Contrat signé', canal:'Visite', date:'2026-08-28'},{sujet:'Assurance', message:'Reçue', canal:'Email', date:'2026-08-30'}] },
+    { nom:'Martin Lucie', telephone:'06 00 00 00 03', statutAvance:'Nouveau', echanges:[{sujet:'Demande', message:'Intéressée', canal:'Email', date:'2026-08-31'}] },
   ],
-  upcoming: [
-    {type:'visite', label:'Visite Dupont', meta:'sam. 05/09 10h00', delay:'dans 2j', color:'red'},
-    {type:'contrat', label:'Début contrat Jansen', meta:'emplacement 15 — 01/10', delay:'dans 28j', color:'orange'},
-    {type:'alerte', label:'Assurance manquante — Leroy', meta:'emplacement 3 — relancer', delay:'actif', color:'warn'},
-  ],
+  contrats: [],
   revenus: {
     ca_actif: 226,
     ca_projete: 2016,
@@ -401,37 +374,35 @@ function fullName(clientObj) {
 function adaptData(raw) {
   if (!raw.chapelles) return raw;
   const chapelles = raw.chapelles;
-  const convs = (raw.conversations || []).map(c => {
+  const byClient = {};
+  (raw.conversations || []).forEach(c => {
     const clientObj = (c.Clients || [])[0] || {};
-    const d = c['Date reception'] ? String(c['Date reception']).slice(0,10) : '';
-    const daysSince = c['Date reception'] ? Math.floor((Date.now() - new Date(c['Date reception']).getTime()) / 86400000) : 0;
-    return {
-      client: fullName(clientObj),
-      telephone: clientObj.Telephone || '',
-      vehicule: clientObj['Marque / Modele'] || '—',
-      statut: c.Statut || 'Nouveau',
-      canal: c.Canal || '',
-      sujet: c.Sujet || '',
+    const key = clientObj.Id ? 'c' + clientObj.Id : 'anon_' + (c.Sujet || Math.random());
+    if (!byClient[key]) {
+      byClient[key] = {
+        clientId: clientObj.Id || null,
+        nom: fullName(clientObj),
+        telephone: clientObj.Telephone || '',
+        vehicule: clientObj['Marque / Modele'] || '',
+        echanges: []
+      };
+    }
+    byClient[key].echanges.push({
+      sujet: c.Sujet || 'Sans objet',
       message: c.Message || '',
-      dernier_msg: d || '—',
-      jours_sans_reponse: c['Reponse envoyee'] ? 0 : daysSince,
-      assurance: c.Contrats && c.Contrats.length ? (c.Contrats[0]['Attestation assurance'] || '—') : '—'
-    };
+      canal: c.Canal || '',
+      date: c['Date reception'] ? String(c['Date reception']).slice(0,10) : '',
+      statut: c.Statut || 'Nouveau'
+    });
   });
-  const upcoming = [];
-  (raw.visites || []).forEach(v => {
-    const clientObj = (v.Clients || [])[0] || {};
-    upcoming.push({type:'visite', label:`Visite ${fullName(clientObj)}`, meta:v['Date / Heure'] || '', delay:'planifiee', color:'red'});
+  const contacts = Object.values(byClient);
+  const rank = { 'Ferme':0, 'Nouveau':1, 'Relance':2, 'En cours':3, 'Traite':4 };
+  contacts.forEach(c => {
+    c.statutAvance = c.echanges.reduce((m, e) => (rank[e.statut] ?? 0) > (rank[m] ?? 0) ? e.statut : m, 'Ferme');
+    c.echanges.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   });
-  (raw.contrats || []).filter(c => c['Date debut'] && new Date(c['Date debut']) > new Date()).forEach(c => {
-    const clientObj = (c.Clients || [])[0] || {};
-    upcoming.push({type:'contrat', label:`Début contrat ${fullName(clientObj)}`, meta:`${c['Date debut'] || ''}`, delay:'à venir', color:'orange'});
-  });
-  (raw.contrats || []).filter(c => c['Attestation assurance'] === 'Manquante').forEach(c => {
-    const clientObj = (c.Clients || [])[0] || {};
-    upcoming.push({type:'alerte', label:`Assurance manquante — ${fullName(clientObj)}`, meta:`relancer`, delay:'actif', color:'warn'});
-  });
-  return { chapelles, emplacements: raw.emplacements, conversations: convs, contrats: raw.contrats, upcoming, revenus: raw.revenus };
+  contacts.sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr'));
+  return { chapelles, emplacements: raw.emplacements, contacts, contrats: raw.contrats, revenus: raw.revenus };
 }
 
 function renderFill(data) {
@@ -485,50 +456,35 @@ function renderRevenue(data) {
 
 function renderConversations(data) {
   const list = document.getElementById('convList');
-  const items = data.conversations || [];
-  if (!items.length) {
+  const contacts = data.contacts || [];
+  if (!contacts.length) {
     list.innerHTML = '<li><div class="upcoming-meta" style="padding:10px 0">Aucun échange en cours</div></li>';
     return;
   }
-  list.innerHTML = items.map(c => {
-    const s = c.statut || 'Nouveau';
+  list.innerHTML = contacts.map(c => {
+    const s = c.statutAvance || 'Nouveau';
     const statutClass = {
-      'Nouveau':'badge-new','En cours':'badge-en-cours','Visite planifiee':'badge-visite','Visite planifiée':'badge-visite',
-      'Signe':'badge-signe','Signé':'badge-signe','Actif':'badge-actif','Termine':'badge-termine','Terminé':'badge-termine',
-      'Traite':'badge-actif','Relance':'badge-en-cours'
+      'Ferme':'badge-termine','Nouveau':'badge-new','Relance':'badge-en-cours','En cours':'badge-en-cours','Traite':'badge-actif',
+      'Visite planifiee':'badge-visite','Visite planifiée':'badge-visite','Signe':'badge-signe','Signé':'badge-signe','Actif':'badge-actif'
     }[s] || 'badge-new';
-return `<li class="conv-item">
+    const echangesHtml = c.echanges.map(e => `
+      <div class="echange-item">
+        <div class="conv-sujet">${e.sujet || 'Sans objet'}</div>
+        <div class="conv-msg">${e.message || '—'}</div>
+        <div class="conv-meta"><span>${e.canal || '—'}</span><span>${e.date || ''}</span></div>
+      </div>
+    `).join('');
+    return `<li class="conv-item">
       <details>
         <summary>
           <span class="conv-chevron">▶</span>
-          <span class="conv-name">${c.client || '?'}</span>
+          <span class="conv-name">${c.nom || '?'}</span>
           ${c.telephone ? `<span class="upcoming-meta">${c.telephone}</span>` : ''}
+          ${c.echanges.length > 1 ? `<span class="upcoming-meta">(${c.echanges.length})</span>` : ''}
           <span class="badge ${statutClass}">${s}</span>
         </summary>
-        <div class="conv-detail">
-          <div class="conv-sujet">${c.sujet || 'Sans objet'}</div>
-          <div class="conv-msg">${c.message || '—'}</div>
-          <div class="conv-meta">
-            <span>${c.canal || '—'}</span>
-            <span>${c.dernier_msg}</span>
-            ${c.assurance && c.assurance !== '—' ? `<span>Assurance : ${c.assurance}</span>` : ''}
-          </div>
-        </div>
+        <div class="conv-detail">${echangesHtml}</div>
       </details>
-    </li>`;
-  }).join('');
-}
-
-function renderUpcoming(data) {
-  const list = document.getElementById('upcomingList');
-  list.innerHTML = data.upcoming.map(u => {
-    const dotClass = {red:'dot-red',orange:'dot-orange',blue:'dot-blue',warn:'dot-warn'}[u.color] || 'dot-blue';
-    return `<li class="upcoming-item">
-      <div class="upcoming-dot ${dotClass}"></div>
-      <div class="upcoming-text">
-        <div class="upcoming-label">${u.label}</div>
-        <div class="upcoming-meta">${u.meta} — <strong>${u.delay}</strong></div>
-      </div>
     </li>`;
   }).join('');
 }
@@ -577,7 +533,6 @@ async function loadData() {
   renderRevenue(data);
   renderConversations(data);
   renderContrats(data);
-  renderUpcoming(data);
   const now = new Date();
   document.getElementById('lastUpdate').textContent = `MAJ ${now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`;
 }
