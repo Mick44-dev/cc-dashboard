@@ -14,6 +14,13 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Download processed-ids state
+        uses: actions/download-artifact@v4
+        with:
+          name: processed-ids
+          path: state
+        continue-on-error: true
+
       - name: Poll iCloud IMAP for Mon Hangar emails
         env:
           IMAP_HOST: imap.mail.me.com
@@ -30,6 +37,21 @@ jobs:
           import sys
           import re
           import html as htmlmod
+          import os
+
+          STATE_FILE = "state/processed-ids.json"
+
+          def load_processed():
+              try:
+                  with open(STATE_FILE, "r") as f:
+                      return set(json.load(f))
+              except Exception:
+                  return set()
+
+          def save_processed(ids):
+              os.makedirs("state", exist_ok=True)
+              with open(STATE_FILE, "w") as f:
+                  json.dump(sorted(ids), f)
 
           def decode_header_value(hdr):
               if hdr is None:
@@ -99,7 +121,7 @@ jobs:
                   print(f"Webhook error: {e}", file=sys.stderr)
                   return None
 
-          import os
+          processed = load_processed()
 
           try:
               conn = imaplib.IMAP4_SSL(os.environ["IMAP_HOST"], int(os.environ["IMAP_PORT"]))
@@ -122,6 +144,12 @@ jobs:
                   raw = msg_data[0][1]
                   msg = email.message_from_bytes(raw)
 
+                  message_id = msg.get("Message-ID") or ""
+                  if message_id and message_id in processed:
+                      conn.store(msg_id, "+FLAGS", "\\Seen")
+                      print(f"Skipping already-processed: {message_id[:40]}")
+                      continue
+
                   subject = decode_header_value(msg.get("Subject"))
                   from_addr = decode_header_value(msg.get("From"))
                   date_str = decode_header_value(msg.get("Date"))
@@ -132,12 +160,15 @@ jobs:
                       "from": from_addr,
                       "date": date_str,
                       "text": body,
+                      "message_id": message_id,
                   }
 
                   print(f"Forwarding: {subject[:60]}")
                   status_code = send_to_webhook(payload)
                   if status_code and 200 <= status_code < 300:
                       conn.store(msg_id, "+FLAGS", "\\Seen")
+                      if message_id:
+                          processed.add(message_id)
                       print(f"Forwarded OK (HTTP {status_code})")
                   else:
                       print(f"Forward FAILED ({status_code})", file=sys.stderr)
@@ -146,4 +177,14 @@ jobs:
           except Exception as e:
               print(f"IMAP error: {e}", file=sys.stderr)
               sys.exit(1)
+          finally:
+              save_processed(processed)
         shell: python3 {0}
+
+      - name: Upload processed-ids state
+        uses: actions/upload-artifact@v4
+        with:
+          name: processed-ids
+          path: state/processed-ids.json
+          retention-days: 90
+          overwrite: true
