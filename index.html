@@ -112,6 +112,23 @@ body {
   min-width: 35px;
   text-align: right;
 }
+.demi-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px 24px;
+}
+.demi-label {
+  font-size: 0.75rem;
+  color: var(--text2);
+  min-width: 30px;
+}
+.demi-count {
+  font-size: 0.75rem;
+  color: var(--text2);
+  min-width: 35px;
+  text-align: right;
+}
 .total-row {
   margin-top: 12px;
   padding-top: 12px;
@@ -406,31 +423,31 @@ function adaptData(raw) {
 }
 
 function renderFill(data) {
-  const chapelles = data.chapelles || [1,2,3,4].map(c => {
-    const spots = (data.emplacements || []).filter(e => (e.Chapelle || e.chapelle) == c);
-    const occ = spots.filter(e => (e.Statut || e.statut) === 'Occupe' || (e.Statut || e.statut) === 'Occup\u00e9').length;
-    const res = spots.filter(e => (e.Statut || e.statut) === 'Reserve' || (e.Statut || e.statut) === 'R\u00e9serv\u00e9').length;
-    const total = spots.length || 8;
-    return {c, occ, res, libre: total - occ - res, total, pct: total > 0 ? ((occ + res) / total * 100).toFixed(0) : 0};
-  });
-  const totalOcc = chapelles.reduce((s,c) => s + c.occ, 0);
-  const totalRes = chapelles.reduce((s,c) => s + c.res, 0);
-  const totalAll = 32;
-  const totalPct = ((totalOcc + totalRes) / totalAll * 100).toFixed(0);
+  const chapelles = data.chapelles || [];
+  const totalAll = chapelles.reduce((s, c) => s + (c.total || 0), 0) || 32;
+  const totalPris = chapelles.reduce((s, c) => s + (c.pris || 0), 0);
+  const totalPct = totalAll > 0 ? Math.round(totalPris / totalAll * 100) : 0;
 
   let html = '';
   chapelles.forEach(ch => {
-    const fillClass = ch.pct > 60 ? 'green' : ch.pct > 30 ? 'orange' : 'green';
     html += `<div class="chapelle-row">
       <span class="chapelle-label">Chapelle ${ch.c}</span>
-      <div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${ch.pct}%"></div></div>
-      <span class="chapelle-count">${ch.occ + ch.res}/${ch.total}</span>
+      <div class="progress-bar"><div class="progress-fill green" style="width:${ch.pct || 0}%"></div></div>
+      <span class="chapelle-count">${ch.pris}/${ch.total}</span>
     </div>`;
+    (ch.demi || []).forEach(d => {
+      const klass = d.pct > 60 ? 'green' : d.pct > 30 ? 'orange' : 'green';
+      html += `<div class="demi-row">
+        <span class="demi-label">${d.label}</span>
+        <div class="progress-bar"><div class="progress-fill ${klass}" style="width:${d.pct || 0}%"></div></div>
+        <span class="demi-count">${d.pris}/${d.total}</span>
+      </div>`;
+    });
   });
   html += `<div class="total-row chapelle-row">
     <span class="chapelle-label">Total</span>
     <div class="progress-bar"><div class="progress-fill green" style="width:${totalPct}%"></div></div>
-    <span class="chapelle-count">${totalOcc + totalRes}/${totalAll}</span>
+    <span class="chapelle-count">${totalPris}/${totalAll}</span>
   </div>`;
   document.getElementById('fillContent').innerHTML = html;
 }
