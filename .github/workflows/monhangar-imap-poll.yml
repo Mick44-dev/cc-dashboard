@@ -99,7 +99,7 @@ jobs:
                       text = msg.get_payload(decode=True).decode(charset, errors="replace")
                   except Exception:
                       text = msg.get_payload(decode=True).decode("utf-8", errors="replace")
-              if msg.get_content_type() == "text/html":
+              if "<" in text and ">" in text:
                   text = html_to_text(text)
               return text[:5000]
 
