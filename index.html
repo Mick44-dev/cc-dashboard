@@ -427,7 +427,7 @@ function adaptData(raw) {
     (e.Contrats || []).forEach(cc => { empMap[cc.Id] = { Numero: e.Numero }; });
   });
   const contrats = (raw.contrats || []).slice().map(c => {
-    c.Emplacement = c.Emplacement && c.Emplacement.length ? c.Emplacement : (empMap[c.Id] ? [empMap[c.Id]] : []);
+    c.Emplacement = empMap[c.Id] ? [empMap[c.Id]] : (c.Emplacement && c.Emplacement.length ? c.Emplacement : []);
     return c;
   });
   return { chapelles, emplacements: raw.emplacements, contacts, contrats, revenus: raw.revenus };
