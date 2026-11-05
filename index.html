@@ -309,6 +309,7 @@ details[open] .conv-chevron { transform: rotate(90deg); }
 </div>
 
 <div class="mock-banner" id="mockBanner" style="display:none">Données de démonstration — en attente de connexion NocoDB</div>
+<pre id="debug" style="display:none;background:var(--surface2);border:1px solid var(--orange);border-radius:8px;padding:10px;font-size:0.75rem;color:var(--text);white-space:pre-wrap;margin-bottom:12px"></pre>
 
 <div class="grid">
   <div class="card" id="fillCard">
@@ -391,6 +392,14 @@ function fullName(clientObj) {
 }
 
 function adaptData(raw) {
+  debugLog('raw keys', raw ? Object.keys(raw) : 'null');
+  debugLog('emplacements count', raw && raw.emplacements ? raw.emplacements.length : 'null');
+  if (raw && raw.emplacements && raw.emplacements.length) {
+    debugLog('e[0] Chapelle', raw.emplacements[0].Chapelle);
+    debugLog('e[0] Statut', raw.emplacements[0].Statut);
+    debugLog('e[0] Travee', raw.emplacements[0].Travee);
+    debugLog('e[0] Contrats', raw.emplacements[0].Contrats ? (typeof raw.emplacements[0].Contrats) : 'null');
+  }
   if (!raw.chapelles) return raw;
   // Compute chapelles fill from emplacements (n8n-side computation is broken)
   const emplacements = raw.emplacements || [];
@@ -455,6 +464,10 @@ function adaptData(raw) {
     c.Emplacement = empMap[c.Id] ? [empMap[c.Id]] : (c.Emplacement && c.Emplacement.length ? c.Emplacement : []);
     return c;
   });
+  debugLog('chapelles count', chapelles ? chapelles.length : 'null');
+  debugLog('chapelles[0]', chapelles && chapelles[0] ? { c: chapelles[0].c, pris: chapelles[0].pris, total: chapelles[0].total } : 'empty');
+  debugLog('contacts count', contacts ? contacts.length : 'null');
+  debugLog('contrats count', contrats ? contrats.length : 'null');
   return {
     chapelles,
     emplacements: raw.emplacements,
@@ -464,6 +477,13 @@ function adaptData(raw) {
       taux_remplissage: chapelles.reduce((s, c) => s + c.pris, 0) / Math.max(chapelles.reduce((s, c) => s + c.total, 0), 1)
     })
   };
+}
+
+function debugLog(label, val) {
+  const el = document.getElementById('debug');
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent += label + ': ' + JSON.stringify(val) + '\n';
 }
 
 function renderFill(data) {
