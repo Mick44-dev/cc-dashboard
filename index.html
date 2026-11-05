@@ -392,7 +392,32 @@ function fullName(clientObj) {
 
 function adaptData(raw) {
   if (!raw.chapelles) return raw;
-  const chapelles = raw.chapelles;
+  // Compute chapelles fill from emplacements (n8n-side computation is broken)
+  const emplacements = raw.emplacements || [];
+  const byChapelle = {};
+  emplacements.forEach(e => {
+    const ch = e.Chapelle;
+    if (!byChapelle[ch]) byChapelle[ch] = [];
+    byChapelle[ch].push(e);
+  });
+  const chapelles = Object.keys(byChapelle).sort().map(ch => {
+    const list = byChapelle[ch];
+    const total = list.length;
+    const pris = list.filter(e => e.Statut === 'Reserve').length;
+    const pct = total > 0 ? Math.round(pris / total * 100) : 0;
+    const byTravee = {};
+    list.forEach(e => {
+      const t = e.Travee || '?';
+      if (!byTravee[t]) byTravee[t] = [];
+      byTravee[t].push(e);
+    });
+    const demi = Object.keys(byTravee).sort().map(t => {
+      const tl = byTravee[t];
+      const tp = tl.filter(e => e.Statut === 'Reserve').length;
+      return { label: t, pris: tp, total: tl.length, pct: tl.length > 0 ? Math.round(tp / tl.length * 100) : 0 };
+    });
+    return { c: parseInt(ch), total, pris, pct, demi };
+  });
   const byClient = {};
   (raw.conversations || []).forEach(c => {
     const clientObj = (c.Clients || [])[0] || {};
@@ -430,7 +455,15 @@ function adaptData(raw) {
     c.Emplacement = empMap[c.Id] ? [empMap[c.Id]] : (c.Emplacement && c.Emplacement.length ? c.Emplacement : []);
     return c;
   });
-  return { chapelles, emplacements: raw.emplacements, contacts, contrats, revenus: raw.revenus };
+  return {
+    chapelles,
+    emplacements: raw.emplacements,
+    contacts,
+    contrats,
+    revenus: Object.assign({}, raw.revenus, {
+      taux_remplissage: chapelles.reduce((s, c) => s + c.pris, 0) / Math.max(chapelles.reduce((s, c) => s + c.total, 0), 1)
+    })
+  };
 }
 
 function renderFill(data) {
