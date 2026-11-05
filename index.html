@@ -419,7 +419,7 @@ function adaptData(raw) {
     return { c: parseInt(ch), total, pris, pct, demi };
   });
   const byClient = {};
-  (raw.conversations || []).forEach(c => {
+  (raw.conversations || []).filter(c => (c.Clients || []).length > 0).forEach(c => {
     const clientObj = (c.Clients || [])[0] || {};
     const key = clientObj.Id ? 'c' + clientObj.Id : 'anon_' + (c.Sujet || Math.random());
     if (!byClient[key]) {
