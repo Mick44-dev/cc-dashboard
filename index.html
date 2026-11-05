@@ -188,6 +188,7 @@ td {
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
+.td-numero { text-align: center; font-weight: 600; min-width: 36px; }
 tr:last-child td { border-bottom: none; }
 tr:hover { background: var(--surface2); }
 
@@ -332,6 +333,7 @@ details[open] .conv-chevron { transform: rotate(90deg); }
         <thead>
           <tr>
             <th>Client</th>
+            <th>N°</th>
             <th>Téléphone</th>
             <th>Véhicule</th>
             <th>Statut</th>
@@ -419,7 +421,16 @@ function adaptData(raw) {
     c.echanges.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   });
   contacts.sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr'));
-  return { chapelles, emplacements: raw.emplacements, contacts, contrats: raw.contrats, revenus: raw.revenus };
+  // Build contrat→emplacement map from the emplacements side
+  const empMap = {};
+  (raw.emplacements || []).forEach(e => {
+    (e.Contrats || []).forEach(cc => { empMap[cc.Id] = { Numero: e.Numero }; });
+  });
+  const contrats = (raw.contrats || []).slice().map(c => {
+    c.Emplacement = c.Emplacement && c.Emplacement.length ? c.Emplacement : (empMap[c.Id] ? [empMap[c.Id]] : []);
+    return c;
+  });
+  return { chapelles, emplacements: raw.emplacements, contacts, contrats, revenus: raw.revenus };
 }
 
 function renderFill(data) {
@@ -511,11 +522,13 @@ function renderContrats(data) {
   const list = (data.contrats || []).slice().sort((a,b) => (a['Date debut']||'').localeCompare(b['Date debut']||''));
   tbody.innerHTML = list.map(c => {
     const clientObj = (c.Clients || [])[0] || {};
+    const empObj = (c.Emplacement || [])[0] || {};
     const statut = c.Statut || '—';
     const statutClass = { 'Actif':'badge-actif', 'En attente':'badge-en-cours', 'Resilie':'badge-termine', 'Expire':'badge-termine' }[statut] || 'badge-new';
     const depot = c['Date depot'] ? String(c['Date depot']).slice(0,10) : '—';
     return `<tr>
       <td data-label="Client" style="font-weight:600">${fullName(clientObj)}</td>
+      <td data-label="N°" class="td-numero">${empObj.Numero ? '#' + empObj.Numero : '—'}</td>
       <td data-label="Téléphone">${clientObj.Telephone || '—'}</td>
       <td data-label="Véhicule">${clientObj['Marque / Modele'] || '—'} <span style="color:var(--text2)">(${clientObj['Longueur vehicule'] || '—'})</span></td>
       <td data-label="Statut"><span class="badge ${statutClass}">${statut}</span></td>
