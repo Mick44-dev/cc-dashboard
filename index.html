@@ -488,9 +488,11 @@ function debugLog(label, val) {
 
 function renderFill(data) {
   const chapelles = data.chapelles || [];
+  debugLog('renderFill chapelles', chapelles.length ? chapelles.map(c => ({c:c.c, pris:c.pris, total:c.total, pct:c.pct})) : 'empty');
   const totalAll = chapelles.reduce((s, c) => s + (c.total || 0), 0) || 32;
   const totalPris = chapelles.reduce((s, c) => s + (c.pris || 0), 0);
   const totalPct = totalAll > 0 ? Math.round(totalPris / totalAll * 100) : 0;
+  debugLog('fill totals', { totalAll, totalPris, totalPct });
 
   let html = '';
   chapelles.forEach(ch => {
@@ -514,6 +516,8 @@ function renderFill(data) {
     <span class="chapelle-count">${totalPris}/${totalAll}</span>
   </div>`;
   document.getElementById('fillContent').innerHTML = html;
+  debugLog('fill HTML preview', html.substring(0, 200));
+  debugLog('fillContent exists', document.getElementById('fillContent') ? 'yes' : 'no');
 }
 
 function renderRevenue(data) {
